@@ -29,6 +29,7 @@ import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileCollection;
 import org.gradle.api.internal.ConventionTask;
 import org.gradle.api.specs.Spec;
+import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.OutputFiles;
@@ -90,13 +91,17 @@ public class JarjarTask extends ConventionTask {
     }
 
     private final ConfigurableFileCollection sourceFiles;
+    @Input
     private final Set<String> archiveBypasses = new HashSet<String>();
+    @Input
     private final Set<String> archiveExcludes = new HashSet<String>();
     private File destinationDir;
     private String destinationName;
 
     private final DefaultJarProcessor processor = new DefaultJarProcessor();
 
+    @Input
+    private final List<String> commands = new ArrayList<String>();
     public JarjarTask() {
         sourceFiles = getProject().files();
     }
@@ -161,7 +166,7 @@ public class JarjarTask extends ConventionTask {
      * @param files The input FileCollection to consume.
      */
     public void from(@Nonnull FileCollection files) {
-        sourceFiles.from(files);
+        sourceFiles.from(getProject().files(files.getFiles()));
     }
 
     /**
@@ -208,14 +213,22 @@ public class JarjarTask extends ConventionTask {
 
     public void classRename(@Nonnull String pattern, @Nonnull String replacement) {
         processor.addClassRename(new ClassRename(pattern, replacement));
+        commands.add("classRename " + pattern + " " + replacement);
     }
 
     public void classDelete(@Nonnull String pattern) {
         processor.addClassDelete(new ClassDelete(pattern));
+        commands.add("classDelete " + pattern);
     }
 
     public void classClosureRoot(@Nonnull String pattern) {
         processor.addClassKeepTransitive(new ClassKeepTransitive(pattern));
+        commands.add("addClassKeepTransitive " + pattern);
+    }
+
+
+    public List<String> getCommands() {
+        return commands;
     }
 
     @TaskAction
@@ -225,6 +238,7 @@ public class JarjarTask extends ConventionTask {
         outputFile.getParentFile().mkdirs();
         getLogger().info("Running jarjar for {}", outputFile);
         getLogger().info("Inputs are {}", inputFiles);
+        getLogger().info("Commands are {}", getCommands());
 
         JarTransformer transformer = new JarTransformer(outputFile, processor);
         transformer.transform(new ClassPath(getProject().getProjectDir(), inputFiles));
